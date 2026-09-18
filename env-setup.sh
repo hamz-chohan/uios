@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# UIOS Content Studio — env + install on a fresh machine.
-# Run from inside repository or studio folder:
+# UIOS Content Studio - env + install on a fresh machine.
+# Run from inside uios-studio/:
 #   bash env-setup.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
-if [[ ! -f package.json ]]; then
-  echo "package.json is missing."
+if [[ ! -f package.json || ! -f package-lock.json ]]; then
+  echo "This script must run from the uios-studio folder (package.json is missing)."
+  echo "Copy or unzip the project here first, then run: bash env-setup.sh"
   exit 1
 fi
 
@@ -29,7 +30,7 @@ echo "Node $(node -v)  npm $(npm -v)"
 # Copy to .env.local if you want to change values; Next.js loads that file.
 if [[ ! -f .env.local ]]; then
   cat > .env.local <<'EOF'
-# UIOS Studio — local env (no secrets required for the mock demo)
+# UIOS Studio - local env (no secrets required for the mock demo)
 
 # mock = no Vertex calls (default). live = Vertex via ADC.
 MODEL_MODE=mock
@@ -49,15 +50,11 @@ NEXT_TELEMETRY_DISABLED=1
 EOF
   echo "Wrote .env.local (MODEL_MODE=mock)"
 else
-  echo ".env.local already exists — leaving it unchanged"
+  echo ".env.local already exists - leaving it unchanged"
 fi
 
-echo "Installing npm packages…"
-if [[ -f package-lock.json ]]; then
-  npm ci
-else
-  npm install
-fi
+echo "Installing npm packages (npm ci)…"
+npm ci
 
 echo
 echo "Ready. Start the app with:"
@@ -70,4 +67,3 @@ echo "To use live Vertex later:"
 echo "  1. Set MODEL_MODE=live and GOOGLE_CLOUD_PROJECT in .env.local"
 echo "  2. gcloud auth application-default login"
 echo "  3. Restart npm run dev"
-

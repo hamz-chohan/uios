@@ -1,63 +1,64 @@
 # UIOS Content Studio
 
-An AI-powered content generation and studio workspace built with Next.js 16, React 19, and Tailwind CSS v4.
+Skill Creator writes a portable `.md` skill. Publish it, and Document Creators generate from that file in DocGen. The skill defines the document - its sections, which sources feed each one, and any mandatory text.
 
----
+Two skills ship in `src/data/skills/` and are published on boot so DocGen has something to generate from. Anything you author in Skill Creator joins them in the same registry.
 
-## Tech Stack
+No database, no API key. DocGen and Skill Creator both use the mock adapter unless `MODEL_MODE=live` is set with GCP ADC. Live is optional - it is not required to write a skill from a prompt or to generate a document.
 
-- **Framework**: Next.js 16 (App Router) + React 19 + TypeScript 5
-- **Styling**: Tailwind CSS v4 (`@tailwindcss/postcss`)
-- **AI Integrations**: `@google/genai`, `@anthropic-ai/sdk`, `@anthropic-ai/vertex-sdk`
-- **Document Processing**: `docx` (Word export), `marked` (Markdown), `gray-matter`, `puppeteer` (PDF export)
-- **Validation**: `zod`
+## Stack
 
----
+Next.js 16 (App Router) + React 19 + Tailwind v4, TypeScript throughout. Route handlers under `src/app/api/` are the backend; there is no separate server. State lives in `src/lib/store.ts` (in-memory). PDF export uses Puppeteer with system Chromium.
 
-## Quick Start
+## Run locally
 
-### 1. Prerequisites
-- **Node.js** >= 22.0.0
-- **npm** >= 10.0.0
-
-### 2. Installation & Setup
 ```bash
-# Clone the repository
-git clone git@github.com:hamz-chohan/uios.git
-cd uios
-
-# Install dependencies
 npm install
-```
-
-### 3. Run Development Server
-```bash
 npm run dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001) in your browser.
+Open [http://localhost:3001](http://localhost:3001). Pick a workspace role on `/login` (password `demo`, stored in `sessionStorage`).
 
-- **Workspace Roles**: Administrator, Editor, Reviewer
-- **Demo Password**: `demo`
+## Demo path
 
----
+1. Sign in as **Skill Creator**.
+2. Skill Creator → New skill → describe the skill → review the generated `.md` → Publish.
+3. Sign out, sign in as **Document Creator** (or stay as **Administrator**, who can see both).
+4. DocGen → New document → pick a published skill → Generate → review each section.
 
-## Environment Modes
+Sections that the attached sources cannot support come back red as `NEEDS_AUTHOR`. Use the Library's **Ground** action to resolve one against the governed FDA sources with a page citation.
 
-Configuration is managed in `.env.local`:
+## What resets
 
-- **Mock Mode (Default)**:
-  ```env
-  MODEL_MODE=mock
-  ```
-  Runs completely locally without requiring GCP credentials or API keys.
+Skills and documents live in the Node process memory. A server restart drops in-session work; the two bundled skills are re-seeded on boot.
 
-- **Live Mode (Vertex AI)**:
-  ```env
-  MODEL_MODE=live
-  GOOGLE_CLOUD_PROJECT=your-gcp-project
-  ```
-  Authenticate with Google Cloud:
-  ```bash
-  gcloud auth application-default login
-  ```
+## Deploy (Google Cloud Run)
+
+Because state is in-process, deploy **one instance**. A second replica would serve a different registry.
+
+```bash
+gcloud auth login
+gcloud config set project YOUR_GCP_PROJECT
+
+cd uios-studio
+make deploy PROJECT_ID=YOUR_GCP_PROJECT
+make url    PROJECT_ID=YOUR_GCP_PROJECT
+```
+
+That builds the `Dockerfile` in Cloud Build and deploys `uios-studio` to `us-central1` with `MODEL_MODE=mock` (no Vertex calls). Open the printed URL and sign in with a workspace role.
+
+For live Vertex on the Cloud Run service account:
+
+```bash
+make deploy PROJECT_ID=YOUR_GCP_PROJECT MODEL_MODE=live
+```
+
+The runtime service account needs **Vertex AI User**. Cloud Run supplies ADC; do not bake an API key into the image.
+
+`--max-instances 1` is required for the reason above. `--min-instances 0` keeps idle cost at zero; raise it in the `Makefile` if you need a warm demo.
+
+If the public URL returns 403, the service is deployed but not public. Granting `allUsers` the `roles/run.invoker` role needs Owner or Cloud Run Admin - an Editor cannot do it.
+
+## Optional: Vertex RAG Engine
+
+`scripts/setup-corpus.sh` stands up a managed corpus over the two FDA PDFs. Retrieval defaults to deterministic local search over the extracted text and falls back to it on any RAG error, so this is an upgrade, not a prerequisite.

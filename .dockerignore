@@ -1,0 +1,13 @@
+# Note: no *.md rule here. src/data/skills/*.md and src/data/sources/*.md are
+# read at runtime; excluding them would ship an app with an empty registry.
+node_modules
+.next
+.next-verify
+.next-deploycheck
+.git
+.gitignore
+*.tsbuildinfo
+.env*
+.DS_Store
+.vscode
+.idea
